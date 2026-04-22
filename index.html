@@ -2518,6 +2518,21 @@ async function _initSistema(){
 }
 
 function _runApp(){
+  // Defesa: se _loadDados falhou silenciosamente, D pode estar undefined
+  if(typeof D === 'undefined' || D === null){
+    const loader = document.getElementById('dataLoader');
+    if(loader){
+      loader.style.display = 'flex';
+      loader.innerHTML = '<div style="background:#fee;color:#c33;padding:20px;border-radius:8px;text-align:center;max-width:480px;margin:40px auto;">'
+        +'<h3 style="margin:0 0 10px;">Falha ao carregar dados</h3>'
+        +'<p style="margin:0 0 10px;font-size:13px;">Os dados do sistema não foram carregados. Verifique os arquivos JSON no servidor (consolidado.json, filiais.json, dados-atp.json).</p>'
+        +'<button onclick="location.reload()" style="background:#c33;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Recarregar</button>'
+        +'</div>';
+    }
+    console.error('[_runApp] D está undefined ou null. Abortando render.');
+    return;
+  }
+
 
 // ================================================================
 // HELPERS
@@ -2560,7 +2575,7 @@ function mkC(id,cfg){
 
 // Índices de produtos (só existe em modo filial, não em consolidado)
 const byC=new Map(),byE=new Map();
-if(D.produtos && Array.isArray(D.produtos)){
+if(D && D.produtos && Array.isArray(D.produtos)){
   D.produtos.forEach(p=>{
     byC.set(p.c,p);
     if(p.ea&&p.ea!==0)byE.set(String(p.ea),p);
