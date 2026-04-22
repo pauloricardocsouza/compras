@@ -2211,11 +2211,23 @@ async function _bootstrapComAuth(){
   }
 
   // Sessão válida: carregar dados normalmente
+  console.log('[bootstrap] Sessão OK, iniciando _loadDados()');
   try {
     await _loadDados();
+    console.log('[bootstrap] _loadDados concluído, D =', typeof D, D ? Object.keys(D).slice(0,5) : 'UNDEFINED');
     await _initSistema();
+    console.log('[bootstrap] _initSistema concluído');
   } catch(e){
-    console.error('Falha critica no carregamento:', e);
+    console.error('[bootstrap] Falha crítica:', e);
+    const loader = document.getElementById('dataLoader');
+    if(loader){
+      loader.style.display = 'flex';
+      loader.innerHTML = '<div style="background:#fee;color:#c33;padding:20px;border-radius:8px;text-align:center;max-width:560px;margin:40px auto;">'
+        +'<h3 style="margin:0 0 10px;">Erro ao iniciar sistema</h3>'
+        +'<p style="font-size:12px;color:#666;margin:10px 0;font-family:monospace;text-align:left;background:#fff;padding:10px;border-radius:5px;border:1px solid #fcc;">'+(e.message||String(e))+'</p>'
+        +'<button onclick="location.reload()" style="background:#c33;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Recarregar</button>'
+        +'</div>';
+    }
   }
 }
 
@@ -2295,15 +2307,18 @@ function _decidirOqueCarregar(){
 }
 
 async function _loadDados(){
+  console.log('[_loadDados] Iniciando');
   const dlMsg = document.getElementById('dlMsg');
   const dlProg = document.getElementById('dlProg');
 
   // 1. Carregar indice de filiais
   if(dlMsg) dlMsg.textContent = 'Carregando indice de filiais...';
   await _carregarFiliaisIndex();
+  console.log('[_loadDados] filiais carregadas:', _filiaisDisponiveis.length, 'filiais');
 
   // 2. Decidir o que carregar
   const decisao = _decidirOqueCarregar();
+  console.log('[_loadDados] decisão:', decisao);
 
   // 3. Cache do consolidado para acesso futuro
   if(decisao.tipo !== 'consolidado'){
@@ -2327,6 +2342,7 @@ async function _loadDados(){
     if(dlMsg) dlMsg.textContent = 'Processando...';
     const json = await resp.json();
     D = json.D || json;
+    console.log('[_loadDados] D atribuído. Chaves:', D ? Object.keys(D).slice(0,10) : 'NULL');
 
     if(decisao.tipo === 'consolidado'){
       _consolidadoData = D;
@@ -2501,11 +2517,13 @@ function _aplicarPermissoesPaginas(){
 }
 
 async function _initSistema(){
+  console.log('[_initSistema] Iniciando. D =', typeof D, D ? 'OK' : 'UNDEFINED!');
   // Popular cache do perfil (async p/ Firebase, instantâneo p/ mock)
   try {
     await _populatePerfilCache();
+    console.log('[_initSistema] perfil cache OK');
   } catch(e){
-    console.warn('Erro ao popular perfil:', e);
+    console.warn('[_initSistema] Erro ao popular perfil:', e);
   }
   _renderSnapshotBanner();
   _renderSeletorFilial();
