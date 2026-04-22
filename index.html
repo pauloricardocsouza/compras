@@ -1625,7 +1625,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -2535,17 +2535,26 @@ function _renderUserWidget(){
 function _aplicarPermissoesPaginas(){
   const perfil = _getPerfilUsuario();
   if(!perfil) return;
-  const permitidas = new Set(perfil.paginasPermitidas || []);
+  const pp = perfil.paginasPermitidas;
+  // null/undefined/array vazio = sem restrição (admin/super-usuário pode tudo)
+  // Só restringe quando há um array com páginas listadas
+  if(!pp || !Array.isArray(pp) || pp.length === 0){
+    return;
+  }
+  const permitidas = new Set(pp);
   document.querySelectorAll('.sb-link[data-p]').forEach(function(btn){
     const pg = btn.dataset.p;
     if(!permitidas.has(pg)){
       btn.style.display = 'none';
+    } else {
+      btn.style.display = '';
     }
   });
   // Esconder labels de seções vazias
   document.querySelectorAll('.sb-sec').forEach(function(sec){
     const visiveis = sec.querySelectorAll('.sb-link:not([style*="display: none"])').length;
     if(visiveis === 0) sec.style.display = 'none';
+    else sec.style.display = '';
   });
 }
 
