@@ -1,0 +1,28 @@
+{
+  "filiais": [
+    {
+      "sigla": "atp",
+      "nome": "ATP",
+      "descricao": "ATP (Varejo + Atacado)",
+      "arquivo": "dados-atp.json",
+      "ativa": true,
+      "base": "ATP",
+      "base_sigla": "atp"
+    }
+  ],
+  "consolidado_arquivo": "consolidado.json",
+  "atualizado_em": "2026-04-22T11:43:36.327297",
+  "bases": [
+    {
+      "sigla": "atp",
+      "nome": "ATP",
+      "descricao": "ATP (filial única)"
+    },
+    {
+      "sigla": "cp",
+      "nome": "Comercial Pinto",
+      "descricao": "Comercial Pinto Cerqueira (múltiplas filiais)",
+      "placeholder": true
+    }
+  ]
+}

@@ -1576,6 +1576,46 @@ function _getBasesUsuario(){
 // AVISO: Enquanto AUTH_MODE === 'mock', senhas ficam em localStorage em texto puro.
 //        NÃO usar com dados reais de usuários até substituir por Firebase Auth.
 // ================================================================
+// Escape HTML — previne XSS ao interpolar dados em HTML
+const esc = (s) => {
+  if(s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+};
+// Escape para atributos HTML (value="..." etc.) — mais restritivo
+const escAttr = (s) => esc(s);
+// Escape para strings dentro de JavaScript embutido em onclick/etc.
+const escJs = (s) => {
+  if(s === null || s === undefined) return '';
+  return String(s)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/"/g,'\\"')
+    .replace(/\n/g,'\\n')
+    .replace(/\r/g,'\\r')
+    .replace(/</g,'\\u003c');
+};
+// Escape para URLs em href/src - bloqueia esquemas perigosos (javascript:, data:, vbscript:)
+const escUrl = (s) => {
+  if(s === null || s === undefined || s === '') return '#';
+  const str = String(s).trim();
+  if(!str) return '#';
+  // Blacklist de esquemas perigosos (case-insensitive)
+  if(/^(javascript|data|vbscript|file|blob):/i.test(str)){
+    return '#';
+  }
+  // Permite URLs seguras: http/https, mailto, tel, #, ?, /, e paths relativos sem ':'
+  if(/^(https?:|mailto:|tel:|#|\?|\/)/i.test(str) || !/:/.test(str)){
+    return escAttr(str);
+  }
+  return '#';
+};
+
+
 const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 
 // ================================================================
@@ -2456,45 +2496,6 @@ function _runApp(){
 // ================================================================
 // HELPERS
 // ================================================================
-// Escape HTML — previne XSS ao interpolar dados em HTML
-const esc = (s) => {
-  if(s === null || s === undefined) return '';
-  return String(s)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-};
-// Escape para atributos HTML (value="..." etc.) — mais restritivo
-const escAttr = (s) => esc(s);
-// Escape para strings dentro de JavaScript embutido em onclick/etc.
-const escJs = (s) => {
-  if(s === null || s === undefined) return '';
-  return String(s)
-    .replace(/\\/g,'\\\\')
-    .replace(/'/g,"\\'")
-    .replace(/"/g,'\\"')
-    .replace(/\n/g,'\\n')
-    .replace(/\r/g,'\\r')
-    .replace(/</g,'\\u003c');
-};
-// Escape para URLs em href/src - bloqueia esquemas perigosos (javascript:, data:, vbscript:)
-const escUrl = (s) => {
-  if(s === null || s === undefined || s === '') return '#';
-  const str = String(s).trim();
-  if(!str) return '#';
-  // Blacklist de esquemas perigosos (case-insensitive)
-  if(/^(javascript|data|vbscript|file|blob):/i.test(str)){
-    return '#';
-  }
-  // Permite URLs seguras: http/https, mailto, tel, #, ?, /, e paths relativos sem ':'
-  if(/^(https?:|mailto:|tel:|#|\?|\/)/i.test(str) || !/:/.test(str)){
-    return escAttr(str);
-  }
-  return '#';
-};
-
 const fB=(n,d=2)=>'R$ '+(n||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const fAbbr=n=>{n=n||0;if(Math.abs(n)>=1e6)return'R$'+(n/1e6).toFixed(2)+'M';if(Math.abs(n)>=1e3)return'R$'+(n/1e3).toFixed(1)+'k';return fB(n,0);};
 const fK=n=>fB(n,0);
