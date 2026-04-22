@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- Firebase SDK (compat - sem build step) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -1624,7 +1625,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 
 // ================================================================
 // CONFIGURAÇÃO FIREBASE
@@ -2128,7 +2129,7 @@ function _renderTelaLogin(precisaTrocarSenha){
       ${AUTH_MODE === 'mock' ? '<div style="text-align:center;margin-top:16px;padding:8px;background:#fee;color:#c33;border-radius:5px;font-size:10px;font-family:monospace;">⚠ MODO MOCK · dados de teste em localStorage</div>' : ''}
       <div style="text-align:center;margin-top:20px;font-size:10px;color:#999;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;border-top:1px solid #eee;padding-top:14px;">
         Desenvolvido por R2 Soluções Empresariais
-        <div style="font-size:9px;color:#bbb;margin-top:4px;letter-spacing:.15em;">v1.0</div>
+        <div style="font-size:9px;color:#bbb;margin-top:4px;letter-spacing:.15em;">v${APP_VERSION}</div>
       </div>
     </div>
   `;
