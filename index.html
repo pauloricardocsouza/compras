@@ -1948,6 +1948,8 @@ async function _logout(){
   // Pequeno delay para garantir que o audit foi enviado antes do reload
   setTimeout(function(){ window.location.reload(); }, 100);
 }
+// Expor em window para que onclick inline (em HTML) consiga chamar
+window._logout = _logout;
 
 // Atualiza o _getPerfilUsuario (substituindo o mock anterior)
 // Cache do perfil do usuário em memória (populado após login Firebase)
