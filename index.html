@@ -1625,7 +1625,18 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
+
+// ================================================================
+// HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
+// ================================================================
+// tt(opts): retorna opts como estão (era usado para mesclar configs sem spread)
+// Hoje funciona como passthrough mantendo compatibilidade com chamadas existentes
+function tt(opts){ return opts || {}; }
+
+// scalesXY(scales): retorna o objeto de scales como está
+// Centraliza ponto de extensão futura caso precise normalizar opções
+function scalesXY(scales){ return scales || {}; }
 
 // ================================================================
 // CONFIGURAÇÃO FIREBASE
