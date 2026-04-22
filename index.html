@@ -1234,6 +1234,19 @@ td[class*="cob"] { white-space: nowrap; }
 </style>
 </head>
 <body>
+<script>
+// Restaurar estado do sidebar (collapsed) antes do render para evitar flash visual
+(function(){
+  try {
+    if(localStorage.getItem('sidebarCollapsed') === '1'){
+      document.addEventListener('DOMContentLoaded', function(){
+        var ab = document.querySelector('.app-body');
+        if(ab) ab.classList.add('sidebar-collapsed');
+      });
+    }
+  } catch(e){}
+})();
+</script>
 
 <header class="topbar">
   <div class="brand">
@@ -1257,7 +1270,7 @@ td[class*="cob"] { white-space: nowrap; }
   <div class="sb-sec">
     <div class="sb-sec-label" style="display:flex;align-items:center;justify-content:space-between;padding-right:4px;">
       <span>Menu Principal</span>
-      <button id="collapseBtn" title="Ocultar/mostrar menu" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;padding:3px 5px;border-radius:5px;display:flex;align-items:center;transition:background .15s,color .15s;" onmouseenter="this.style.background='var(--surface-3)';this.style.color='var(--text)'" onmouseleave="this.style.background='transparent';this.style.color='var(--text-muted)'">
+      <button id="collapseBtn" title="Ocultar menu" onclick="document.querySelector('.app-body').classList.add('sidebar-collapsed');try{localStorage.setItem('sidebarCollapsed','1');}catch(e){}" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;padding:3px 5px;border-radius:5px;display:flex;align-items:center;transition:background .15s,color .15s;" onmouseenter="this.style.background='var(--surface-3)';this.style.color='var(--text)'" onmouseleave="this.style.background='transparent';this.style.color='var(--text-muted)'">
         <span class="ico-open"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 19l-7-7 7-7"/><path d="M21 12H5" opacity=".5"/></svg></span>
         <span class="ico-close" style="display:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 5l7 7-7 7"/><path d="M3 12h16" opacity=".5"/></svg></span>
       </button>
@@ -1625,7 +1638,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.5';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -3424,10 +3437,7 @@ function renderABC(){
     +'</div>'
     +'<div class="ds-body">'
     +'<div id="abc-cards" class="kg c4" style="margin-bottom:14px;"></div>'
-    +'<div id="abc-chart-wrap" style="background:var(--surface-2);border-radius:8px;padding:14px;margin-bottom:10px;">'
-    +'<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Curva acumulada</div>'
-    +'<div style="position:relative;height:220px;"><canvas id="abc-chart"></canvas></div>'
-    +'</div>'
+    /* Curva acumulada removida (gráfico oculto) */
     +'</div></div>'
 
     // Tabela
@@ -3715,7 +3725,8 @@ function _abcCalcularERender(){
 
 function _abcRenderChart(items, classes, total){
   const ctx = document.getElementById('abc-chart');
-  if(!ctx) return;
+  if(!ctx) return; // canvas removido — função fica como no-op
+
   if(ABC_STATE._chart) ABC_STATE._chart.destroy();
 
   // Amostragem: até 200 pontos para não pesar
