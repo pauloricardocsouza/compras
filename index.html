@@ -1645,6 +1645,37 @@ function _fbCacheInvalidate(){
   _fbCache.perfis = null;
 }
 
+// Audit log: mock -> só console; firebase -> escreve em auditLog
+// Fire-and-forget: não bloqueia UI
+function _auditLog(tipo, detalhes, identidadeOverride){
+  try {
+    const ident = identidadeOverride || _getSessao();
+    const log = {
+      timestamp: new Date().toISOString(),
+      uid: ident ? ident.uid : 'anonymous',
+      email: ident ? ident.email : null,
+      nome: ident ? ident.nome : null,
+      tipo: tipo,
+      detalhes: detalhes || null,
+      contexto: {
+        filial: _filialAtual ? _filialAtual.sigla : null,
+        snapshot: _snapshotCarregado ? _snapshotCarregado.data : null,
+        url: window.location.pathname + window.location.search
+      }
+    };
+    if(window.console && console.debug) console.debug('[AUDIT]', tipo, detalhes||'', log);
+    if(AUTH_MODE === 'firebase' && window.fbDb){
+      // Fire-and-forget (não await)
+      window.fbDb.collection('auditLog').add(log).catch(function(e){
+        console.warn('Falha ao registrar audit log:', e);
+      });
+    }
+  } catch(e){
+    console.warn('_auditLog erro:', e);
+  }
+}
+
+
 // ================================================================
 // AUTH ADAPTER — unifica mock e firebase
 // ================================================================
@@ -3033,36 +3064,6 @@ const AUDIT_TIPOS = {
   'filial_change':   {label:'Filial trocada',          icone:'shop',   cor:'blue'},
   'smoke_test_run':  {label:'Diagnóstico executado',    icone:'check',  cor:'gray'}
 };
-
-// Audit log: mock -> só console; firebase -> escreve em auditLog
-// Fire-and-forget: não bloqueia UI
-function _auditLog(tipo, detalhes, identidadeOverride){
-  try {
-    const ident = identidadeOverride || _getSessao();
-    const log = {
-      timestamp: new Date().toISOString(),
-      uid: ident ? ident.uid : 'anonymous',
-      email: ident ? ident.email : null,
-      nome: ident ? ident.nome : null,
-      tipo: tipo,
-      detalhes: detalhes || null,
-      contexto: {
-        filial: _filialAtual ? _filialAtual.sigla : null,
-        snapshot: _snapshotCarregado ? _snapshotCarregado.data : null,
-        url: window.location.pathname + window.location.search
-      }
-    };
-    if(window.console && console.debug) console.debug('[AUDIT]', tipo, detalhes||'', log);
-    if(AUTH_MODE === 'firebase' && window.fbDb){
-      // Fire-and-forget (não await)
-      window.fbDb.collection('auditLog').add(log).catch(function(e){
-        console.warn('Falha ao registrar audit log:', e);
-      });
-    }
-  } catch(e){
-    console.warn('_auditLog erro:', e);
-  }
-}
 
 // Mock: gera eventos de exemplo para visualizacao da UI
 function _gerarLogsMock(){
