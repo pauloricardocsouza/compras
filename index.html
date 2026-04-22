@@ -1639,7 +1639,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -4517,6 +4517,7 @@ async function _runSmokeTests(){
   _auditLog('smoke_test_run', {ok:resultadosGlobais.OK, fail:resultadosGlobais.FAIL, warn:resultadosGlobais.WARN, skip:resultadosGlobais.SKIP, duracao_s:parseFloat(durTotal)});
   _smokeRodando = false;
 }
+window._runSmokeTests = _runSmokeTests;
 
 function renderAdmSmoke(){
   const el = document.getElementById('adm-smoke-list');
@@ -5371,7 +5372,7 @@ function renderDeptTable(items,mx,isSec){
 
   // Item 9: calcular totalizador
   const tot={vdo:0,luc:0,cl:0,cob:0,pp:0,ev:0,dvc:0,dvf:0,ni:0,nip:0,tl:0,jr:0};
-  items.forEach(d=>{const cl=comLiq(d.com,d.dvf);tot.vdo+=d.vdo;tot.luc+=d.luc;tot.cl+=cl;tot.ev+=(d.ev||0);tot.dvc+=(d.dvc||0);tot.dvf+=(d.dvf||0);tot.ni+=d.ni;tot.nip+=d.nip;tot.tl+=(d.tl||0);tot.jr+=(d.jr||0);});
+  items.forEach(d=>{const cl=comLiq(d.com,d.dvf);tot.vdo+=d.vdo;tot.luc+=(d.luc||0);tot.cl+=cl;tot.ev+=(d.ev||0);tot.dvc+=(d.dvc||0);tot.dvf+=(d.dvf||0);tot.ni+=d.ni;tot.nip+=d.nip;tot.tl+=(d.tl||d.luc||0);tot.jr+=(d.jr||0);});
   tot.cob=tot.vdo>0?tot.cl/tot.vdo*100:0;
   tot.pp=tot.cl>0?(items.reduce((s,d)=>s+d.pag,0)/items.reduce((s,d)=>s+d.com,0)*100):0;
   tot.marg=tot.vdo>0?tot.luc/tot.vdo*100:0;
@@ -5391,7 +5392,7 @@ function renderDeptTable(items,mx,isSec){
         <div>${fB(d.vdo,0)}</div>
       </td>
       <td class="${mc(d.marg)}">${fP(d.marg)}</td>
-      <td class="${(d.tl||0)<0?'val-neg':(d.tl||0)>0?'val-pos':''}">${fB(d.tl||0,0)}</td>
+      <td class="${((d.tl||d.luc||0))<0?'val-neg':((d.tl||d.luc||0))>0?'val-pos':''}">${fB(d.tl||d.luc||0,0)}</td>
       <td>${fB(cl,0)}</td>
       <td class="${cobClsText(cob)}">${cob>0?cobTag(cob)+' '+fP(cob):'—'}</td>
       <td class="val-pos">${fP(d.pp)}</td>
@@ -5697,7 +5698,7 @@ function renderAlertas(){
   const al=D.alertas,df=activeDept;
   const CFGS=[
     {k:'prejuizo',ico:'⚠',tt:'Prejuízo recorrente',sb:'3+ meses no vermelho e vendas > R$1.000',cls:'dn',
-     fn:p=>`Prejuízo R$${fN(Math.abs(p.tl),0)} em ${p.mr} de ${p.mv} meses`},
+     fn:p=>`Prejuízo R$${fN(Math.abs(p.tl),0)} em ${p.mr} ${p.mr===1?'mês':'meses'} no vermelho`},
     {k:'excesso_compra',ico:'▣',tt:'Excesso de compras',sb:'Comprou muito acima da venda com estoque alto',cls:'wn',
      fn:p=>`Comprou ${fI(p.qc)} un, vendeu ${fI(p.tq)} un · Estoque: ${fI(p.eq)} un`},
     {k:'parado',ico:'⏸',tt:'Estoque parado',sb:'Cobertura > 120 dias e estoque > R$2.000',cls:'wn',
