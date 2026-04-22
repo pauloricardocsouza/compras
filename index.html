@@ -2558,12 +2558,14 @@ function mkC(id,cfg){
   return CH[id];
 }
 
-// Índices de produtos
+// Índices de produtos (só existe em modo filial, não em consolidado)
 const byC=new Map(),byE=new Map();
-D.produtos.forEach(p=>{
-  byC.set(p.c,p);
-  if(p.ea&&p.ea!==0)byE.set(String(p.ea),p);
-});
+if(D.produtos && Array.isArray(D.produtos)){
+  D.produtos.forEach(p=>{
+    byC.set(p.c,p);
+    if(p.ea&&p.ea!==0)byE.set(String(p.ea),p);
+  });
+}
 
 
 
