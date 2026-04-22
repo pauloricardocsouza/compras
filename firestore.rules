@@ -1,0 +1,100 @@
+// ============================================================
+// REGRAS DE SEGURANÇA — Cloud Firestore
+// GPC Sistema Analítico · R2 Soluções
+// ============================================================
+// Copie e cole em: Firebase Console → Firestore Database → Regras
+//
+// ORDEM DE PUBLICAÇÃO:
+// 1. PRIMEIRO: publicar "regras-temporarias" abaixo (para rodar o seed)
+// 2. Rodar o seed-firebase.html (criar admin e perfisTemplate)
+// 3. DEPOIS: substituir pelas "regras-producao" e publicar
+
+// ============================================================
+// REGRAS TEMPORÁRIAS (apenas durante o seed inicial)
+// ============================================================
+/*
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+*/
+
+// ============================================================
+// REGRAS DE PRODUÇÃO (usar após o seed)
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin';
+    }
+
+    function isActive() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.ativo == true;
+    }
+
+    // ------------------------------------------------------------
+    // usuarios/{uid}
+    // ------------------------------------------------------------
+    // Leitura: o próprio usuário lê seu documento, admin lê todos
+    // Escrita: apenas admin
+    match /usuarios/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // perfisTemplate/{sigla}
+    // ------------------------------------------------------------
+    // Leitura: qualquer logado
+    // Escrita: apenas admin
+    match /perfisTemplate/{sigla} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // auditLog/{id}
+    // ------------------------------------------------------------
+    // Append-only: qualquer logado pode criar logs; só admin lê
+    // Nunca atualiza nem deleta (auditoria é imutável)
+    match /auditLog/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------
+    // configuracoes/{base}
+    // ------------------------------------------------------------
+    // Para etapa 9 do backlog: configs sincronizadas no servidor
+    // Leitura: qualquer logado
+    // Escrita: apenas admin
+    match /configuracoes/{base} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // Catch-all: bloqueia qualquer coleção não prevista
+    // ------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
