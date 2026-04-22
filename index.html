@@ -1935,10 +1935,18 @@ function _saveSessao(uid, email, nome, perfil){
   try { localStorage.setItem('sessaoAtual', JSON.stringify(sess)); } catch(e){}
   return sess;
 }
-function _logout(){
-  _auditLog('logout');
+async function _logout(){
+  try { _auditLog('logout'); } catch(e){}
   try { localStorage.removeItem('sessaoAtual'); } catch(e){}
-  window.location.reload();
+  if(AUTH_MODE === 'firebase' && window.fbAuth){
+    try {
+      await window.fbAuth.signOut();
+    } catch(e){
+      console.warn('Firebase signOut falhou:', e);
+    }
+  }
+  // Pequeno delay para garantir que o audit foi enviado antes do reload
+  setTimeout(function(){ window.location.reload(); }, 100);
 }
 
 // Atualiza o _getPerfilUsuario (substituindo o mock anterior)
@@ -2161,19 +2169,8 @@ async function _bootstrapComAuth(){
       }
       return;
     }
-    // Sincronizar onAuthStateChanged: se Firebase fez logout (token expirado), limpa sessão local
-    window.fbAuth.onAuthStateChanged(function(user){
-      const sess = _getSessao();
-      if(!user && sess){
-        // Firebase deslogou, limpar sessão local
-        try { localStorage.removeItem('sessaoAtual'); } catch(e){}
-        // Só recarrega se estiver na meio do sistema (não durante login)
-        if(!document.getElementById('loginOverlay')){
-          console.warn('Firebase session expired, reloading');
-          window.location.reload();
-        }
-      }
-    });
+    // Nota: onAuthStateChanged era usado para detectar logout externo, mas causava
+    // race condition com _logout() manual. Hoje _logout() é a fonte de verdade única.
   }
 
   const sess = _getSessao();
