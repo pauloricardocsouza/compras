@@ -674,7 +674,8 @@ body { display:flex; flex-direction:column; min-height:100vh; }
 /* CHARTS */
 .row2 { display:grid; grid-template-columns:3fr 2fr; gap:14px; margin-bottom:14px; }
 .row2eq { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
-.cc { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:14px; }
+.cc { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:14px; min-width:0; }
+.cc canvas { max-width:100%; }
 .cc .cct { font-weight:800; font-size:13px; color:var(--text); letter-spacing:-.01em; }
 .cc .ccs { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:2px; margin-bottom:10px; }
 .cc .cch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
@@ -1638,7 +1639,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.6';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
