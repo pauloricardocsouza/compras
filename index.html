@@ -1708,7 +1708,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.4';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -7323,12 +7323,15 @@ function computeVencidos(){
 // ================================================================
 const EXC_DIAS_PERIODO = 110; // Jan(31)+Fev(28)+Mar(31)+Abr parcial(~20)
 
-function computeExcesso(deptFiltro, secFiltro){
+function computeExcesso(deptFiltro, secFiltro, cadAte){
   const DIAS_IDEAL = getEstoqueIdeal();
   const items=[];
   D.produtos.forEach(function(p){
     if(deptFiltro && p.dp!==deptFiltro) return;
     if(secFiltro && p.sc!==secFiltro) return;
+    // Excluir itens cadastrados depois da data de corte.
+    // Comparação lexicográfica funciona com strings ISO (AAAA-MM-DD).
+    if(cadAte && p.dc && p.dc > cadAte) return;
     const eq=p.eq||0, tq=p.tq||0, ev=p.ev||0;
     if(eq<=0) return;
     let diasCob, excessoQt, excessoValor, diasExcesso, vendaDiaria, tier;
@@ -7349,7 +7352,7 @@ function computeExcesso(deptFiltro, secFiltro){
       else tier='critico';
     }
     items.push({
-      c:p.c, d:p.d, f:p.f||'', dp:p.dp||'', sc:p.sc||'',
+      c:p.c, d:p.d, f:p.f||'', dp:p.dp||'', sc:p.sc||'', dc:p.dc||'',
       eq:eq, ev:ev, pmv:p.pmv||0,
       vendaDiaria:vendaDiaria, diasCob:diasCob,
       diasExcesso:diasExcesso, excessoQt:excessoQt,
@@ -7361,20 +7364,37 @@ function computeExcesso(deptFiltro, secFiltro){
 
 let excDeptFiltro = null;
 let excSecaoFiltro = null;
+let excCadAte;  // undefined até o primeiro render; depois: string ISO 'AAAA-MM-DD' ou null
 
 function renderExcesso(){
   if(isConsolidado()){ renderAvisoConsolidado("page-excesso", "A análise de excesso de estoque trabalha SKU por SKU. Selecione uma filial para ver os produtos com mais dias de cobertura."); return; }
   const deptos=['Todos'].concat(D.departamentos.map(d=>d.n));
 
+  // Default do corte: 30 dias antes da data do estoque (ou hoje, se não houver)
+  // Itens cadastrados DEPOIS dessa data são considerados recentes demais pra entrar na análise.
+  // O usuário pode ajustar ou limpar o filtro a qualquer momento.
+  if(excCadAte === undefined){
+    const baseDate = (D.meta && D.meta.data_estoque) ? new Date(D.meta.data_estoque) : new Date();
+    if(!isNaN(baseDate.getTime())){
+      baseDate.setDate(baseDate.getDate() - 30);
+      excCadAte = baseDate.toISOString().slice(0,10);
+    } else {
+      excCadAte = null;
+    }
+  }
+
   const html=`
     <div class="ph"><div class="pk">Estoque</div><h2>Excesso <em>de estoque</em></h2></div>
     <div class="ph-sep"></div>
     <div class="pfb">
-      <div class="pfb-inner">
+      <div class="pfb-inner" style="flex-wrap:wrap;row-gap:8px;">
         <span class="pfl">DEPARTAMENTO</span>
         <select id="exc-dp" class="psel">${deptos.map(d=>`<option value="${d==='Todos'?'':d}">${d}</option>`).join('')}</select>
         <span class="pfl" style="margin-left:10px;">SE\xc7\xc3O</span>
         <select id="exc-sc" class="psel"><option value="">Todas</option></select>
+        <span class="pfl" style="margin-left:10px;" title="Inclui apenas itens cadastrados at\xe9 esta data. Itens mais novos n\xe3o entram na an\xe1lise (ainda n\xe3o tiveram tempo de rodar).">CADASTRADO AT\xc9</span>
+        <input type="date" id="exc-cad-ate" class="psel" style="width:auto;" value="${excCadAte||''}">
+        <button id="exc-cad-limpar" class="btn-ac" style="padding:4px 9px;font-size:10px;font-weight:600;border-radius:5px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);cursor:pointer;" title="Remover filtro de data de cadastro">Limpar</button>
         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-left:auto;">
           Ideal: ${getEstoqueIdeal()} dias \xb7 Per\xedodo: ${EXC_DIAS_PERIODO} dias (Jan-Abr/26)
         </span>
@@ -7504,14 +7524,27 @@ function renderExcesso(){
   document.getElementById('exc-btn-xlsx').addEventListener('click', _excExportarXLSX);
   document.getElementById('exc-btn-pdf').addEventListener('click', _excExportarPDF);
 
+  // Filtro de cadastro até
+  const cadInput = document.getElementById('exc-cad-ate');
+  cadInput.addEventListener('change', function(){
+    excCadAte = this.value || null;
+    renderExcessoBody();
+  });
+  document.getElementById('exc-cad-limpar').addEventListener('click', function(){
+    excCadAte = null;
+    cadInput.value = '';
+    renderExcessoBody();
+  });
+
   renderExcessoBody();
 }
 
 function renderExcessoBody(){
-  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro, excCadAte);
   const totalEstoque = D.produtos.reduce((s,p)=>{
     if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
     if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
+    if(excCadAte && p.dc && p.dc > excCadAte) return s;
     return s + (p.ev||0);
   }, 0);
 
@@ -7533,7 +7566,7 @@ function renderExcessoBody(){
   // KPIs
   document.getElementById('exc-kpis').innerHTML = kgHtml([
     {l:'Valor em excesso', v:fB(totalExcesso,0), s:fP(pctExc)+' do estoque total', cls:pctExc>30?'dn':pctExc>15?'hl':''},
-    {l:'SKUs em excesso',  v:fI(items.length), s:'de '+fI(D.produtos.filter(p=>(!excDeptFiltro||p.dp===excDeptFiltro)&&(!excSecaoFiltro||p.sc===excSecaoFiltro)&&(p.eq||0)>0).length)+' com estoque'},
+    {l:'SKUs em excesso',  v:fI(items.length), s:'de '+fI(D.produtos.filter(p=>(!excDeptFiltro||p.dp===excDeptFiltro)&&(!excSecaoFiltro||p.sc===excSecaoFiltro)&&(!excCadAte||!p.dc||p.dc<=excCadAte)&&(p.eq||0)>0).length)+' com estoque'},
     {l:'Dias m\xe9dios acima', v:Math.round(diasMedios)+' d', s:'al\xe9m dos '+getEstoqueIdeal()+' d ideais'},
     {l:'Pior depto', v:piorDp[0], s:fB(piorDp[1],0)+' em excesso', cls:'hl'},
   ]);
@@ -7608,6 +7641,8 @@ function renderExcessoBody(){
   const fnAgg = {};
   D.produtos.forEach(p=>{
     if(excDeptFiltro && p.dp!==excDeptFiltro) return;
+    if(excSecaoFiltro && p.sc!==excSecaoFiltro) return;
+    if(excCadAte && p.dc && p.dc > excCadAte) return;
     const f=p.f||'(sem fornecedor)';
     if(!fnAgg[f]) fnAgg[f]={n:f,skus:0,skusExc:0,estoqueTot:0,excesso:0};
     fnAgg[f].skus++;
@@ -7639,13 +7674,14 @@ function renderExcessoBody(){
 // com excesso, não apenas os 100 que aparecem na tela.
 // ================================================================
 function _excExportarXLSX(){
-  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro, excCadAte);
   if(!items.length){ alert('Sem itens com excesso para exportar.'); return; }
   const tierLbl = {leve:'LEVE',medio:'MEDIO',alto:'ALTO',critico:'CRITICO','sem-venda':'SEM VENDA'};
   const totalExcesso = items.reduce((s,i)=>s+i.excessoValor,0);
   const totalEstoque = D.produtos.reduce((s,p)=>{
     if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
     if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
+    if(excCadAte && p.dc && p.dc > excCadAte) return s;
     return s + (p.ev||0);
   }, 0);
   const dtFmt = (D.meta && D.meta.data_estoque) ? D.meta.data_estoque : new Date().toISOString().slice(0,10);
@@ -7658,6 +7694,7 @@ function _excExportarXLSX(){
     ['Ideal de cobertura (dias)', getEstoqueIdeal()],
     ['Departamento', excDeptFiltro || 'Todos'],
     ['Se\u00e7\u00e3o', excSecaoFiltro || 'Todas'],
+    ['Cadastrado at\u00e9', excCadAte ? excCadAte.split('-').reverse().join('/') : 'Sem filtro'],
     [],
     ['Total de itens em excesso', items.length],
     ['Valor em excesso (R$)', totalExcesso],
@@ -7668,11 +7705,12 @@ function _excExportarXLSX(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
 
   const header = ['C\u00f3digo','Produto','Departamento','Se\u00e7\u00e3o','Fornecedor',
-                  'Estoque (qt)','Venda/dia (qt)','Dias cobertura','Dias excesso',
+                  'Dt.Cadastro','Estoque (qt)','Venda/dia (qt)','Dias cobertura','Dias excesso',
                   'Qt excesso','Valor estoque (R$)','Valor excesso (R$)',
                   'Pre\u00e7o venda unit.','Classifica\u00e7\u00e3o'];
   const rows = items.map(i => [
     i.c, i.d, i.dp, i.sc, i.f,
+    i.dc ? i.dc.split('-').reverse().join('/') : '',
     i.eq, i.vendaDiaria, i.diasCob>=999?'sem venda':Number(i.diasCob.toFixed(1)),
     i.diasExcesso>=999?'sem venda':Number(i.diasExcesso.toFixed(1)),
     Number(i.excessoQt.toFixed(3)), Number(i.ev.toFixed(2)),
@@ -7688,12 +7726,13 @@ function _excExportarXLSX(){
 }
 
 function _excExportarPDF(){
-  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro, excCadAte);
   if(!items.length){ alert('Sem itens com excesso para exportar.'); return; }
   const totalExcesso = items.reduce((s,i)=>s+i.excessoValor,0);
   const totalEstoque = D.produtos.reduce((s,p)=>{
     if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
     if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
+    if(excCadAte && p.dc && p.dc > excCadAte) return s;
     return s + (p.ev||0);
   }, 0);
   const pctExc = totalEstoque>0 ? totalExcesso/totalEstoque*100 : 0;
@@ -7751,7 +7790,7 @@ function _excExportarPDF(){
 </head><body>
   <div class="noprint"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>
   <h1>Excesso de estoque - GPC</h1>
-  <div class="sub">Filial: <strong>${esc(filialTxt)}</strong> \xb7 Estoque em ${esc(dtFmt)} \xb7 Ideal: ${getEstoqueIdeal()} dias \xb7 Departamento: <strong>${esc(excDeptFiltro||'Todos')}</strong> \xb7 Se\xe7\xe3o: <strong>${esc(excSecaoFiltro||'Todas')}</strong> \xb7 Gerado em ${esc(hoje)}</div>
+  <div class="sub">Filial: <strong>${esc(filialTxt)}</strong> \xb7 Estoque em ${esc(dtFmt)} \xb7 Ideal: ${getEstoqueIdeal()} dias \xb7 Departamento: <strong>${esc(excDeptFiltro||'Todos')}</strong> \xb7 Se\xe7\xe3o: <strong>${esc(excSecaoFiltro||'Todas')}</strong> \xb7 Cadastrado at\xe9: <strong>${esc(excCadAte? excCadAte.split('-').reverse().join('/') : 'Sem filtro')}</strong> \xb7 Gerado em ${esc(hoje)}</div>
   <div class="kpis">
     <div class="kpi"><div class="l">Valor em excesso</div><div class="v">${fmtBr(totalExcesso,0)}</div></div>
     <div class="kpi"><div class="l">% do estoque</div><div class="v">${fmtPct(pctExc)}</div></div>
