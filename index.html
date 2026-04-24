@@ -5091,17 +5091,24 @@ async function _procGravarUpload(file, relatorio, base, filial, periodoIni, peri
   return {id: docRef.id, path, url};
 }
 
-// Busca os últimos uploads de um determinado relatório/base para mostrar histórico no card
+// Busca os últimos uploads de um determinado relatório/base para mostrar histórico no card.
+// Query simplificada (sem orderBy composto) para não exigir criação manual de índice.
+// A ordenação é feita no cliente, já que são no máximo 5-20 registros.
 async function _procListarUltimos(rotina, base, limite){
   try{
     const db = firebase.firestore();
     const snap = await db.collection('uploads')
       .where('rotina','==',rotina)
       .where('base','==',base)
-      .orderBy('uploaded_at','desc')
-      .limit(limite||5)
       .get();
-    return snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    // Ordenar por uploaded_at desc (pode ser serverTimestamp pendente em uploads recentes)
+    docs.sort((a,b)=>{
+      const ta = a.uploaded_at && a.uploaded_at.toMillis ? a.uploaded_at.toMillis() : 0;
+      const tb = b.uploaded_at && b.uploaded_at.toMillis ? b.uploaded_at.toMillis() : 0;
+      return tb - ta;
+    });
+    return docs.slice(0, limite||5);
   }catch(e){
     console.warn('[proc] Falha listar uploads', rotina, base, e);
     return [];
