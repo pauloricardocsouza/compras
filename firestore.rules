@@ -43,6 +43,13 @@ service cloud.firestore {
              get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin';
     }
 
+    function isAdminOrGestor() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin' ||
+              get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'gestor');
+    }
+
     function isActive() {
       return isSignedIn() &&
              exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
@@ -53,10 +60,18 @@ service cloud.firestore {
     // usuarios/{uid}
     // ------------------------------------------------------------
     // Leitura: o próprio usuário lê seu documento, admin lê todos
-    // Escrita: apenas admin
+    // Escrita: admin pode tudo; o próprio usuário pode atualizar apenas
+    // os campos senha_temp e ultimo_acesso (necessário para a troca
+    // de senha do primeiro acesso e registro de login funcionarem
+    // sem erro).
     match /usuarios/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['senha_temp', 'ultimo_acesso', 'ultimo_login'])
+      );
     }
 
     // ------------------------------------------------------------
@@ -94,13 +109,13 @@ service cloud.firestore {
     // ------------------------------------------------------------
     // uploads/{id}   (NOVO na v2.0 — página Processamento)
     // ------------------------------------------------------------
-    // Metadados dos arquivos XLSX enviados da página de Processamento
-    // Leitura: admin (histórico completo)
-    // Criação: admin (apenas admins podem enviar relatórios)
-    // Atualização e exclusão bloqueadas (imutabilidade dos envios)
+    // Metadados dos arquivos XLSX enviados da página de Processamento.
+    // Admin e gestor podem enviar relatórios (criação).
+    // Ambos podem ler o histórico.
+    // Atualização e exclusão bloqueadas (imutabilidade dos envios).
     match /uploads/{uploadId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin() &&
+      allow read: if isAdminOrGestor();
+      allow create: if isAdminOrGestor() &&
                        request.resource.data.uploaded_by == request.auth.uid;
       allow update, delete: if false;
     }

@@ -1358,11 +1358,14 @@ textarea.proc-inp{resize:vertical;min-height:44px}
     <button class="sb-link" data-p="diag-forn"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>Fornecedor</button>
   </div>
   <div class="sb-sec">
+    <div class="sb-sec-label">Processamento</div>
+    <button class="sb-link" data-p="proc"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>Upload de relatórios</button>
+  </div>
+  <div class="sb-sec">
     <div class="sb-sec-label">Configuração</div>
     <button class="sb-link" data-p="historico"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Histórico</button>
     <button class="sb-link" data-p="ajuda"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>Ajuda</button>
     <button class="sb-link" data-p="admin"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Administração</button>
-    <button class="sb-link" data-p="proc"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>Processamento</button>
   </div>
 </aside>
 <button id="restoreBtn" title="Abrir menu" onclick="document.querySelector('.app-body').classList.remove('sidebar-collapsed');try{localStorage.setItem('sidebarCollapsed','0');}catch(e){}">
@@ -1857,18 +1860,27 @@ async function _doLoginFirebase(email, senha){
 async function _trocarSenhaFirebase(uid, novaSenha){
   if(!novaSenha || novaSenha.length < 6) return {ok:false, erro:'Senha precisa ter pelo menos 6 caracteres'};
   if(!window.fbAuth || !window.fbAuth.currentUser) return {ok:false, erro:'Sessão expirada. Faça login novamente.'};
+  // Passo 1: trocar a senha no Firebase Auth (o que realmente importa)
   try {
     await window.fbAuth.currentUser.updatePassword(novaSenha);
-    // Limpar flag senha_temp no Firestore
-    await window.fbDb.collection('usuarios').doc(uid).update({ senha_temp: false });
-    _fbCacheInvalidate();
-    return {ok:true};
   } catch(e){
     let erro = 'Erro ao trocar senha';
     if(e.code === 'auth/weak-password') erro = 'Senha muito fraca';
     else if(e.code === 'auth/requires-recent-login') erro = 'Sessão expirou. Faça login novamente para trocar a senha.';
     return {ok:false, erro: erro};
   }
+  // Passo 2: tentar limpar a flag senha_temp no Firestore.
+  // Se falhar (permissão), NÃO reverte o passo 1; a senha já foi trocada.
+  // A flag será limpa automaticamente no próximo login bem-sucedido
+  // (veja _doLoginFirebase, que detecta discrepância e corrige).
+  try {
+    await window.fbDb.collection('usuarios').doc(uid).update({ senha_temp: false });
+  } catch(e){
+    console.warn('[trocarSenha] Senha trocada com sucesso, mas falhou ao limpar flag no Firestore:', e && e.message);
+    // Não é erro fatal. Continua.
+  }
+  _fbCacheInvalidate();
+  return {ok:true};
 }
 
 async function _getUsuariosFirebase(){
@@ -1968,7 +1980,7 @@ const PAGINAS_CATALOGO = [
   {id:'diag-forn',    nome:'Diagnóstico fornecedor',grupo:'Diagnóstico'},
   {id:'historico',    nome:'Histórico',          grupo:'Configuração'},
   {id:'admin',        nome:'Administração',      grupo:'Configuração'},
-  {id:'proc',         nome:'Processamento',      grupo:'Configuração'},
+  {id:'proc',         nome:'Upload de relatórios',grupo:'Processamento'},
   {id:'ajuda',        nome:'Ajuda',              grupo:'Configuração'},
 ];
 
@@ -2840,8 +2852,9 @@ async function renderAdmUsuarios(){
       +'PERFIL: '+esc(tplPerfil.nome)+' · ÚLTIMO ACESSO: '+esc(ult)
       +'</div>'
       +'</div>'
-      +'<div style="display:flex;gap:6px;">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
       +'<button onclick="abrirEditarUsuario(\''+escJs(u.uid)+'\')" style="background:var(--surface);border:1px solid var(--border-strong);color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">Editar</button>'
+      +(u.senha_temp ? '<button onclick="limparFlagSenhaTemp(\''+escJs(u.uid)+'\')" title="Marcar como senha definitiva (corrige tag zumbi para usuários que já trocaram a senha)" style="background:transparent;border:1px solid #d97706;color:#d97706;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">Limpar SENHA TEMP</button>' : '')
       +(u.uid !== (_getSessao()||{}).uid ? '<button onclick="toggleAtivoUsuario(\''+escJs(u.uid)+'\')" style="background:transparent;border:1px solid '+(u.ativo?'var(--danger)':'var(--success)')+';color:'+(u.ativo?'var(--danger-text)':'var(--success-text)')+';padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">'+(u.ativo?'Desativar':'Ativar')+'</button>' : '')
       +'</div></div>';
   }).join('') + '</div>';
@@ -2864,6 +2877,29 @@ window.toggleAtivoUsuario = async function(uid){
   if(!r.ok){ alert('Erro ao salvar: '+(r.erro||'desconhecido')); return; }
   _auditLog('admin_user_toggle', {alvo_email: u.email, ativo: u.ativo});
   await renderAdmUsuarios();
+};
+
+// Limpar a flag senha_temp de um usuário (usado para corrigir casos onde
+// a flag ficou zumbi porque o update do Firestore falhava por regra
+// antes da correção da v2.0).
+window.limparFlagSenhaTemp = async function(uid){
+  const usuarios = await _getUsuarios();
+  const u = usuarios.find(x => x.uid === uid);
+  if(!u) return;
+  if(!confirm('Marcar a senha de '+u.nome+' como definitiva?\n\nIsso remove a tag SENHA TEMP e assume que o usuário já trocou a senha temporária. Use somente se ele já consegue entrar com uma senha que não é a temporária cadastrada por você.')) return;
+  try {
+    if(AUTH_MODE === 'firebase'){
+      await window.fbDb.collection('usuarios').doc(uid).update({ senha_temp: false });
+    } else {
+      u.senha_temp = false;
+      await _saveUsuario(u);
+    }
+    _fbCacheInvalidate && _fbCacheInvalidate();
+    _auditLog('admin_clear_senha_temp', {alvo_email: u.email});
+    await renderAdmUsuarios();
+  } catch(e){
+    alert('Erro ao limpar flag: '+(e.message||e));
+  }
 };
 
 window.abrirEditarUsuario = async function(uid){
@@ -5152,15 +5188,23 @@ async function renderProc(){
   const container = document.getElementById('page-proc');
   if(!container) return;
 
-  // Só admins podem acessar
-  const perfil = window._perfilAtual || (_getPerfil && _getPerfil());
-  const isAdmin = perfil && (perfil.pode_gerenciar_usuarios === true || perfil.nome === 'Admin' || perfil.id === 'admin');
-  if(!isAdmin){
+  // Admin e gestor podem acessar; visualizador não
+  const perfil = _getPerfilUsuario();
+  const perfilTipo = perfil && (perfil.perfil || perfil.id || perfil.nome);
+  const podeProc = perfil && (
+    perfil.podeGerenciarUsuarios === true ||
+    perfil.pode_gerenciar_usuarios === true ||
+    perfilTipo === 'admin' ||
+    perfilTipo === 'gestor' ||
+    (Array.isArray(perfil.paginasPermitidas) && perfil.paginasPermitidas.indexOf('proc') >= 0) ||
+    (Array.isArray(perfil.paginas) && perfil.paginas.indexOf('proc') >= 0)
+  );
+  if(!podeProc){
     container.innerHTML = `
       <div class="ph"><div class="pk">Processamento</div><h2>Upload de <em>relatórios Winthor</em></h2></div>
       <div class="ph-sep"></div>
       <div class="page-body">
-        <div class="empty-state"><p>Esta página é restrita a administradores.</p></div>
+        <div class="empty-state"><p>Esta página está disponível apenas para administradores e gestores.</p></div>
       </div>`;
     return;
   }
