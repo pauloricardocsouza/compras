@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script>
 // Firebase init — precisa rodar antes do <script> principal
 (function(){
@@ -1232,6 +1233,69 @@ td[class*="cob"] { white-space: nowrap; }
   /* Page-body tem padding reduzido para dar mais espaço */
   .page-body, .diag-area { padding: 0 10px 50px !important; }
 }
+
+/* =======================================================
+   Processamento — upload de relatórios Winthor
+   ======================================================= */
+.proc-intro{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:18px;color:#374151;font-size:13px;line-height:1.55}
+.proc-intro-note{margin-top:10px;padding:10px 12px;background:#fef9ed;border-left:3px solid #f59e0b;border-radius:4px;color:#78350f;font-size:12.5px}
+.proc-grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:1200px){.proc-grid{grid-template-columns:1fr 1fr}}
+.proc-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
+.proc-card-head{padding:14px 16px;border-bottom:1px solid #eef1f4;background:linear-gradient(to bottom,#fafbfc,#fff)}
+.proc-card-title{display:flex;align-items:flex-start;gap:12px}
+.proc-rotina-badge{display:inline-block;min-width:52px;text-align:center;padding:6px 8px;background:#2E476F;color:#fff;font-weight:700;font-size:13px;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.proc-card-names{flex:1;min-width:0}
+.proc-card-n{font-weight:700;font-size:15px;color:#111827;margin-bottom:2px}
+.proc-card-s{font-size:12px;color:#6b7280;line-height:1.45}
+.proc-card-meta{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.proc-meta-pill{display:inline-block;padding:3px 9px;background:#eef2f7;color:#374151;font-size:11px;font-weight:600;border-radius:20px;border:1px solid #dfe5ec}
+.proc-badge-sub{display:inline-block;padding:3px 9px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:600;border-radius:20px;border:1px solid #fde68a}
+.proc-badge-acc{display:inline-block;padding:3px 9px;background:#dcfce7;color:#166534;font-size:11px;font-weight:600;border-radius:20px;border:1px solid #bbf7d0}
+.proc-card-body{display:grid;grid-template-columns:1fr;gap:16px;padding:16px}
+@media(min-width:760px){.proc-card-body{grid-template-columns:1fr 1fr}}
+.proc-inst{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px}
+.proc-inst-title{font-weight:700;font-size:12px;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.proc-steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:7px}
+.proc-steps li{display:flex;align-items:flex-start;gap:10px;font-size:12.5px;color:#1f2937;line-height:1.5}
+.proc-step-n{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#2E476F;color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;border-radius:4px;margin-top:1px}
+.proc-step-t{flex:1}
+.proc-form{display:flex;flex-direction:column;gap:10px}
+.proc-form-row{display:flex;flex-direction:column;gap:4px}
+.proc-form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.proc-lbl{font-weight:600;font-size:11.5px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
+.proc-inp{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#111827;background:#fff;font-family:inherit}
+.proc-inp:focus{outline:none;border-color:#2E476F;box-shadow:0 0 0 3px rgba(46,71,111,.12)}
+textarea.proc-inp{resize:vertical;min-height:44px}
+.proc-drop{position:relative;border:2px dashed #cbd5e1;border-radius:8px;padding:14px;text-align:center;transition:all .15s;background:#fafbfc}
+.proc-drop:hover,.proc-drop-over{border-color:#2E476F;background:#eef4fb}
+.proc-drop-label{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:#475569}
+.proc-drop-label svg{margin-bottom:4px;color:#64748b}
+.proc-drop-t{font-weight:600;font-size:13px;color:#334155}
+.proc-drop-s{font-size:11.5px;color:#64748b}
+.proc-file{display:none}
+.proc-file-info{padding:10px 12px;border:1px solid #e5e7eb;border-radius:6px;background:#fafbfc;font-size:12.5px}
+.proc-info-ok{color:#166534;margin-bottom:4px}
+.proc-info-err{color:#991b1b;font-weight:600}
+.proc-info-detail{font-size:12px;color:#4b5563;margin-top:2px}
+.proc-info-detail.proc-ok{color:#166534}
+.proc-info-detail.proc-warn{color:#92400e}
+.proc-actions{display:flex;justify-content:flex-end;gap:8px}
+.proc-btn-proc{padding:9px 18px;font-weight:700;font-size:13px;border-radius:7px;border:none;background:#2E476F;color:#fff;cursor:pointer;transition:background .15s}
+.proc-btn-proc:hover:not(:disabled){background:#1e3558}
+.proc-btn-proc:disabled{background:#9ca3af;cursor:not-allowed}
+.proc-status{min-height:18px;font-size:12.5px}
+.proc-status .proc-info-err,.proc-status .proc-info-ok{padding:8px 10px;border-radius:5px;border:1px solid transparent}
+.proc-status .proc-info-err{background:#fef2f2;border-color:#fecaca}
+.proc-status .proc-info-ok{background:#f0fdf4;border-color:#bbf7d0}
+.proc-card-hist{border-top:1px solid #eef1f4;padding:12px 16px;background:#fafbfc}
+.proc-hist-title{font-weight:700;font-size:11.5px;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.proc-hist-list{display:flex;flex-direction:column;gap:5px}
+.proc-hist-empty{font-size:12px;color:#9ca3af;font-style:italic}
+.proc-hist-item{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;color:#374151;border-bottom:1px dashed #e5e7eb}
+.proc-hist-item:last-child{border-bottom:none}
+.proc-hist-l{color:#111827}
+.proc-hist-r{color:#6b7280}
 </style>
 </head>
 <body>
@@ -1298,6 +1362,7 @@ td[class*="cob"] { white-space: nowrap; }
     <button class="sb-link" data-p="historico"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Histórico</button>
     <button class="sb-link" data-p="ajuda"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>Ajuda</button>
     <button class="sb-link" data-p="admin"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Administração</button>
+    <button class="sb-link" data-p="proc"><span class="sbi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>Processamento</button>
   </div>
 </aside>
 <button id="restoreBtn" title="Abrir menu" onclick="document.querySelector('.app-body').classList.remove('sidebar-collapsed');try{localStorage.setItem('sidebarCollapsed','0');}catch(e){}">
@@ -1534,6 +1599,7 @@ td[class*="cob"] { white-space: nowrap; }
 <section class="page" id="page-historico"></section>
 <section class="page" id="page-ajuda"></section>
 <section class="page" id="page-admin"></section>
+<section class="page" id="page-proc"></section>
 <footer style="border-top:1px solid var(--border);padding:12px 22px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;background:var(--surface-2);">
   <span style="font-weight:700;letter-spacing:.05em;">DESENVOLVIDO POR R2 SOLUÇÕES EMPRESARIAIS <span id="app-version-tag" style="font-weight:400;opacity:.6;margin-left:8px;"></span></span>
   <span>GRUPO PINTO CERQUEIRA · ATP · Jan–Abr/2026 · Estoque 21/04/2026</span>
@@ -1639,7 +1705,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '1.7';
+const APP_VERSION = '2.0';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -1902,6 +1968,7 @@ const PAGINAS_CATALOGO = [
   {id:'diag-forn',    nome:'Diagnóstico fornecedor',grupo:'Diagnóstico'},
   {id:'historico',    nome:'Histórico',          grupo:'Configuração'},
   {id:'admin',        nome:'Administração',      grupo:'Configuração'},
+  {id:'proc',         nome:'Processamento',      grupo:'Configuração'},
   {id:'ajuda',        nome:'Ajuda',              grupo:'Configuração'},
 ];
 
@@ -4793,6 +4860,465 @@ document.getElementById('mainContent').addEventListener('click',e=>{
     document.getElementById('sidebar').classList.remove('open');
 });
 
+// =====================================================================
+// PROCESSAMENTO — upload, parsing e gravação de relatórios Winthor
+// =====================================================================
+// Catálogo dos 7 relatórios que alimentam o sistema. Cada card contém:
+//  - rotina: número Winthor
+//  - nome: label
+//  - finalidade: texto curto para o subtitulo
+//  - formato: xlsx, xls ou ambos
+//  - escopo: 'base' (serve para ATP ou Comercial Pinto inteira) ou 'filial'
+//  - instrucoes: passos literais que o usuário escreveu
+//  - periodo_obrigatorio: se o formulário deve pedir período
+const PROC_RELATORIOS = [
+  {
+    rotina: '203', nome: 'Cadastro de Itens', escopo: 'base', formato: 'xlsx',
+    finalidade: 'Cadastro completo dos produtos · base para EAN, departamento, seção e categoria',
+    periodo_obrigatorio: false,
+    instrucoes: [
+      'Acessar a rotina 203 no WinThor',
+      'Selecionar TODOS os itens',
+      'Exportar em formato XLSX',
+      'A data do envio é considerada a data da exportação',
+      'Informar no formulário qual a base: ATP ou COMERCIAL PINTO',
+      'Chave = código do item (pode se repetir entre bases com produtos diferentes)',
+      'Itens com EAN "0" ou vazio são aceitos e tratados internamente'
+    ],
+    colunas_esperadas: ['Código','Descrição','Fornecedor','Nome do fornecedor','Departamento','Descrição do departamento','Seção','Descrição da seção','Categoria','Nome da categoria','EAN Unid. Tributável','Dt.Cadastro']
+  },
+  {
+    rotina: '218', nome: 'Entrada de Itens', escopo: 'base', formato: 'xlsx',
+    finalidade: 'Todas as entradas de NF do período · lista analítica por nota fiscal',
+    periodo_obrigatorio: true,
+    instrucoes: [
+      'Acessar a rotina 218 no WinThor',
+      'Selecionar TODAS as filiais',
+      'Selecionar TODOS os tipos de entradas',
+      'Informar o período de entradas',
+      'Deixar EM BRANCO o campo "Período de emissão de NF"',
+      'Manter os demais campos em branco',
+      'Na aba Opções, selecionar "Analítico - por nota fiscal"',
+      'Imprimir o relatório padrão (exportar em XLSX)',
+      'Observação: o relatório lista cada entrada; o mesmo item pode entrar várias vezes'
+    ],
+    colunas_esperadas: ['Dt. Entrada','NF','Código','Descrição','Quantidade','Cód. Oper.']
+  },
+  {
+    rotina: '1328', nome: 'Devolução a Fornecedor', escopo: 'base', formato: 'xlsx',
+    finalidade: 'Produtos que entraram e foram devolvidos ao fornecedor no período',
+    periodo_obrigatorio: true,
+    instrucoes: [
+      'Acessar a rotina 1328 no WinThor',
+      'Informar TODAS as filiais',
+      'Informar o período',
+      'Tipo Devolução: Todos',
+      'Tipo de relatório: Analítico',
+      'Forma de pagamento: Todos',
+      'Manter os demais campos em branco',
+      'Exportar em XLSX'
+    ],
+    colunas_esperadas: ['Cod.Prod.','Descrição','Quantidade','Valor']
+  },
+  {
+    rotina: '717', nome: 'Contas a Pagar (em aberto)', escopo: 'base', formato: 'xlsx',
+    finalidade: 'Lançamentos financeiros em aberto · quando quitados saem daqui e vão para 718',
+    periodo_obrigatorio: true,
+    instrucoes: [
+      'Acessar a rotina 717 no WinThor',
+      'Selecionar TODAS as filiais',
+      'Conta: 10001',
+      'Informar o período de lançamento',
+      'Manter os demais campos vazios',
+      'Tipo de parceiro: Todos',
+      'Emitir o relatório Analítico Completo (XLSX)',
+      'Observação: esse relatório substitui o anterior sempre que enviado (mantém sempre a fotografia atual)'
+    ],
+    substitui: true,
+    colunas_esperadas: ['Lanc.','Dt.Emis.NF','Cod.Forn.','Num.Nota','Vl.Duplicata']
+  },
+  {
+    rotina: '718', nome: 'Contas Pagas', escopo: 'base', formato: 'xlsx',
+    finalidade: 'Lançamentos já quitados no período · fonte do % pago, juros pagos e forma de pagamento',
+    periodo_obrigatorio: true,
+    instrucoes: [
+      'Acessar a rotina 718 no WinThor',
+      'Selecionar TODAS as filiais',
+      'Informar o período no campo "Período de pagamento"',
+      'Conta: 10001',
+      'Manter os demais campos em branco',
+      'Parceiro: T - Todos',
+      'Clicar em Pesquisar',
+      'Selecionar o relatório Analítico',
+      'Emitir o relatório padrão (XLSX)'
+    ],
+    colunas_esperadas: ['Lanc.','Grupo','Cod.Forn.','Num.Nota','Vl.Dev.','Juros']
+  },
+  {
+    rotina: '111', nome: 'Faturamento por Produto', escopo: 'base', formato: 'xls',
+    finalidade: 'Vendas mensais por item · deduzindo devoluções · fonte do histórico de faturamento',
+    periodo_obrigatorio: true,
+    instrucoes: [
+      'Acessar a rotina 111 no WinThor',
+      'Informar o período de vendas',
+      'Selecionar "Deduzir Devol."',
+      'Selecionar a aba lateral "Produto"',
+      'Exportar em XLS',
+      'Envia um arquivo por mês para acompanhar a evolução'
+    ],
+    colunas_esperadas: ['Código','Descrição','Qt.Vendida','Vl.Total']
+  },
+  {
+    rotina: '105', nome: 'Posição do Estoque', escopo: 'filial', formato: 'xlsx',
+    finalidade: 'Snapshot do estoque com quantidade, custo unitário e preço de venda',
+    periodo_obrigatorio: false,
+    substitui: true,
+    instrucoes: [
+      'Acessar a rotina 105 no WinThor',
+      'Escolher a filial desejada',
+      'Colocar a região de preço (em ATP: Filial 1 · Região 1)',
+      'Deixar os demais campos em branco',
+      'Na aba Outros Filtros, selecionar: Estoque: Atual; Obs: Ativos; Considerar: Disponível; Produtos: Com estoque > 0',
+      'Exportar em XLSX',
+      'Observação: substitui o estoque anterior (sempre a foto atual)'
+    ],
+    colunas_esperadas: ['Codigo','Descrição','Embalagem','Qt.Est.','C. Real','P. Venda']
+  }
+];
+
+// Parser genérico de XLSX via SheetJS. Retorna array de linhas (cada linha = array de células).
+async function _procLerXlsx(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+  return {sheetName, rows, nRows: rows.length, nCols: Math.max(...rows.map(r=>r.length||0),0)};
+}
+
+// Valida se o arquivo parece ser da rotina esperada — procura colunas-chave no cabeçalho
+function _procValidarLayout(rows, relatorio){
+  const chaves = (relatorio.colunas_esperadas||[]).map(c=>c.toLowerCase().trim());
+  if(chaves.length===0) return {ok:true, achadas:[]};
+  // Procura nas primeiras 50 linhas uma que contenha várias das chaves (headers podem estar em linhas variadas)
+  let melhor = {score:0, linha:-1, achadas:[]};
+  const scanLim = Math.min(50, rows.length);
+  for(let i=0;i<scanLim;i++){
+    const r = rows[i]||[];
+    const vals = r.map(v=>String(v==null?'':v).toLowerCase().trim());
+    const achadas = chaves.filter(k => vals.some(v => v.indexOf(k)>=0));
+    if(achadas.length>melhor.score){melhor={score:achadas.length, linha:i, achadas};}
+  }
+  const pctAchadas = melhor.score/chaves.length;
+  return {ok: pctAchadas>=0.5, pct:pctAchadas, linha:melhor.linha, achadas:melhor.achadas, esperadas:chaves.length};
+}
+
+// Calcula hash SHA-256 curto do arquivo para deduplicação
+async function _procHash(file){
+  const buf = await file.arrayBuffer();
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(h)).slice(0,8).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Faz upload do arquivo para o Firebase Storage e grava metadados no Firestore
+async function _procGravarUpload(file, relatorio, base, filial, periodoIni, periodoFim, observacoes, hash, detected){
+  const user = firebase.auth().currentUser;
+  if(!user) throw new Error('Não autenticado');
+  const storage = firebase.storage();
+  const db = firebase.firestore();
+  const ts = Date.now();
+  const nomeSafe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path = `uploads/${base}/${relatorio.rotina}/${ts}_${nomeSafe}`;
+  const ref = storage.ref().child(path);
+  const snap = await ref.put(file, {contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = await snap.ref.getDownloadURL();
+  const docRef = await db.collection('uploads').add({
+    rotina: relatorio.rotina,
+    rotina_nome: relatorio.nome,
+    base: base,
+    filial: filial || null,
+    periodo_ini: periodoIni || null,
+    periodo_fim: periodoFim || null,
+    observacoes: observacoes || '',
+    arquivo_nome: file.name,
+    arquivo_tamanho: file.size,
+    arquivo_hash: hash,
+    storage_path: path,
+    storage_url: url,
+    detectadas: detected || null,
+    substitui: !!relatorio.substitui,
+    uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+    uploaded_by: user.uid,
+    uploaded_by_email: user.email || null
+  });
+  try{ _auditLog('upload_relatorio', {rotina: relatorio.rotina, base, id: docRef.id, tamanho: file.size}); }catch(e){}
+  return {id: docRef.id, path, url};
+}
+
+// Busca os últimos uploads de um determinado relatório/base para mostrar histórico no card
+async function _procListarUltimos(rotina, base, limite){
+  try{
+    const db = firebase.firestore();
+    const snap = await db.collection('uploads')
+      .where('rotina','==',rotina)
+      .where('base','==',base)
+      .orderBy('uploaded_at','desc')
+      .limit(limite||5)
+      .get();
+    return snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){
+    console.warn('[proc] Falha listar uploads', rotina, base, e);
+    return [];
+  }
+}
+
+// ID do card (ex: 'proc-card-218') usado para seletores DOM
+function _procCardId(rot){ return 'proc-card-'+rot; }
+
+// Template HTML de um card de relatório
+function _procCardHtml(rel){
+  const id = _procCardId(rel.rotina);
+  const escopoLabel = rel.escopo==='base' ? 'Escopo: Base' : 'Escopo: Filial';
+  const fmt = rel.formato==='xls' ? '.xls' : '.xlsx';
+  const instrucoesHtml = rel.instrucoes.map((p,i)=>`<li><span class="proc-step-n">${i+1}</span><span class="proc-step-t">${esc(p)}</span></li>`).join('');
+  const subLabel = rel.substitui ? '<span class="proc-badge-sub" title="Substitui o último upload deste relatório">substitui</span>' : '<span class="proc-badge-acc" title="Acumula com uploads anteriores">acumula</span>';
+  return `
+    <div class="proc-card" id="${id}" data-rotina="${rel.rotina}">
+      <div class="proc-card-head">
+        <div class="proc-card-title">
+          <span class="proc-rotina-badge">${rel.rotina}</span>
+          <div class="proc-card-names">
+            <div class="proc-card-n">${esc(rel.nome)}</div>
+            <div class="proc-card-s">${esc(rel.finalidade)}</div>
+          </div>
+        </div>
+        <div class="proc-card-meta">
+          <span class="proc-meta-pill">${escopoLabel}</span>
+          <span class="proc-meta-pill">${fmt.toUpperCase()}</span>
+          ${subLabel}
+        </div>
+      </div>
+      <div class="proc-card-body">
+        <div class="proc-inst">
+          <div class="proc-inst-title">Instruções de exportação</div>
+          <ol class="proc-steps">${instrucoesHtml}</ol>
+        </div>
+        <div class="proc-form">
+          <div class="proc-form-row">
+            <label class="proc-lbl">Base</label>
+            <select class="proc-inp" id="${id}-base">
+              <option value="ATP">ATP</option>
+              <option value="COMERCIAL_PINTO">COMERCIAL PINTO</option>
+            </select>
+          </div>
+          ${rel.escopo==='filial' ? `
+          <div class="proc-form-row">
+            <label class="proc-lbl">Filial</label>
+            <input type="text" class="proc-inp" id="${id}-filial" placeholder="Ex: Filial 1 (obrigatório)">
+          </div>` : ''}
+          ${rel.periodo_obrigatorio ? `
+          <div class="proc-form-row-2">
+            <div><label class="proc-lbl">Período início</label><input type="date" class="proc-inp" id="${id}-per-ini"></div>
+            <div><label class="proc-lbl">Período fim</label><input type="date" class="proc-inp" id="${id}-per-fim"></div>
+          </div>` : ''}
+          <div class="proc-form-row">
+            <label class="proc-lbl">Observações (opcional)</label>
+            <textarea class="proc-inp" id="${id}-obs" rows="2" placeholder="Ex: Envio mensal de abril/2026"></textarea>
+          </div>
+          <div class="proc-drop" id="${id}-drop">
+            <input type="file" class="proc-file" id="${id}-file" accept="${fmt}">
+            <label for="${id}-file" class="proc-drop-label">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span class="proc-drop-t">Clique para selecionar o arquivo ${fmt}</span>
+              <span class="proc-drop-s">ou arraste aqui</span>
+            </label>
+          </div>
+          <div class="proc-file-info" id="${id}-info" style="display:none"></div>
+          <div class="proc-actions">
+            <button class="btn-ac proc-btn-proc" id="${id}-btn" disabled>Processar e enviar</button>
+          </div>
+          <div class="proc-status" id="${id}-status"></div>
+        </div>
+      </div>
+      <div class="proc-card-hist">
+        <div class="proc-hist-title">Últimos envios</div>
+        <div class="proc-hist-list" id="${id}-hist"><div class="proc-hist-empty">Carregando...</div></div>
+      </div>
+    </div>`;
+}
+
+// Monta tudo e liga os handlers da página Processamento
+async function renderProc(){
+  const container = document.getElementById('page-proc');
+  if(!container) return;
+
+  // Só admins podem acessar
+  const perfil = window._perfilAtual || (_getPerfil && _getPerfil());
+  const isAdmin = perfil && (perfil.pode_gerenciar_usuarios === true || perfil.nome === 'Admin' || perfil.id === 'admin');
+  if(!isAdmin){
+    container.innerHTML = `
+      <div class="ph"><div class="pk">Processamento</div><h2>Upload de <em>relatórios Winthor</em></h2></div>
+      <div class="ph-sep"></div>
+      <div class="page-body">
+        <div class="empty-state"><p>Esta página é restrita a administradores.</p></div>
+      </div>`;
+    return;
+  }
+
+  const cardsHtml = PROC_RELATORIOS.map(_procCardHtml).join('');
+  container.innerHTML = `
+    <div class="ph">
+      <div class="pk">Processamento</div>
+      <h2>Upload de <em>relatórios Winthor</em></h2>
+    </div>
+    <div class="ph-sep"></div>
+    <div class="page-body">
+      <div class="proc-intro">
+        Cada card abaixo corresponde a uma rotina do WinThor. Siga as instruções para exportar o arquivo e anexe-o no campo indicado. O arquivo é validado antes do envio e gravado com todos os metadados para rastreabilidade.
+        <div class="proc-intro-note"><strong>Importante:</strong> Firebase Storage armazena os arquivos XLSX; Firestore guarda os metadados. Relatórios marcados como <em>substitui</em> apagam a versão anterior ao receber uma nova; os <em>acumula</em> mantêm histórico.</div>
+      </div>
+      <div class="proc-grid">${cardsHtml}</div>
+    </div>`;
+
+  // Configurar cada card
+  PROC_RELATORIOS.forEach(rel => _procWireCard(rel));
+}
+
+// Conecta os eventos de um card (file input, drop zone, botão processar)
+function _procWireCard(rel){
+  const id = _procCardId(rel.rotina);
+  const fileInput = document.getElementById(id+'-file');
+  const drop = document.getElementById(id+'-drop');
+  const info = document.getElementById(id+'-info');
+  const btn = document.getElementById(id+'-btn');
+  const status = document.getElementById(id+'-status');
+  const histDiv = document.getElementById(id+'-hist');
+  let arquivoSelecionado = null;
+  let layoutValidado = null;
+
+  function limparInfo(){
+    info.style.display='none';
+    info.innerHTML='';
+    btn.disabled = true;
+    arquivoSelecionado = null;
+    layoutValidado = null;
+    status.innerHTML = '';
+  }
+
+  async function onFileChosen(file){
+    if(!file) return;
+    const fmtOk = rel.formato==='xls' ? /\.xls$/i.test(file.name) : /\.xlsx$/i.test(file.name);
+    if(!fmtOk){
+      info.style.display='block';
+      info.innerHTML = `<div class="proc-info-err">Formato inválido. Esperado: .${rel.formato}</div>`;
+      btn.disabled = true; return;
+    }
+    arquivoSelecionado = file;
+    info.style.display='block';
+    info.innerHTML = `<div class="proc-info-ok"><strong>${esc(file.name)}</strong> (${(file.size/1024/1024).toFixed(2)} MB) · analisando layout...</div>`;
+    try{
+      const parsed = await _procLerXlsx(file);
+      const v = _procValidarLayout(parsed.rows, rel);
+      layoutValidado = {parsed, validacao: v};
+      const linhas = parsed.nRows;
+      let html = `<div class="proc-info-ok"><strong>${esc(file.name)}</strong> (${(file.size/1024/1024).toFixed(2)} MB)</div>`;
+      html += `<div class="proc-info-detail">Aba: <code>${esc(parsed.sheetName)}</code> · ${linhas.toLocaleString('pt-BR')} linhas · ${parsed.nCols} colunas</div>`;
+      if(v.ok){
+        html += `<div class="proc-info-detail proc-ok">Layout reconhecido (${v.achadas.length}/${v.esperadas} colunas-chave encontradas na linha ${v.linha+1})</div>`;
+        btn.disabled = false;
+      } else {
+        html += `<div class="proc-info-detail proc-warn">Layout não reconhecido com segurança (${v.achadas.length}/${v.esperadas}). O envio continua permitido, mas confira se o relatório é o correto.</div>`;
+        btn.disabled = false;
+      }
+      info.innerHTML = html;
+    }catch(e){
+      info.innerHTML = `<div class="proc-info-err">Erro lendo o arquivo: ${esc(e.message||String(e))}</div>`;
+      btn.disabled = true;
+    }
+  }
+
+  fileInput.addEventListener('change', e => onFileChosen(e.target.files[0]));
+
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('proc-drop-over');}));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('proc-drop-over');}));
+  drop.addEventListener('drop', e=>{
+    e.preventDefault();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f){fileInput.files = e.dataTransfer.files; onFileChosen(f);}
+  });
+
+  btn.addEventListener('click', async ()=>{
+    if(!arquivoSelecionado){return;}
+    const base = document.getElementById(id+'-base').value;
+    const filial = rel.escopo==='filial' ? (document.getElementById(id+'-filial').value||'').trim() : null;
+    const perIni = rel.periodo_obrigatorio ? document.getElementById(id+'-per-ini').value : null;
+    const perFim = rel.periodo_obrigatorio ? document.getElementById(id+'-per-fim').value : null;
+    const obs = (document.getElementById(id+'-obs').value||'').trim();
+
+    if(rel.escopo==='filial' && !filial){
+      status.innerHTML = `<div class="proc-info-err">Informe a filial antes de enviar.</div>`; return;
+    }
+    if(rel.periodo_obrigatorio && (!perIni || !perFim)){
+      status.innerHTML = `<div class="proc-info-err">Informe o período (início e fim) antes de enviar.</div>`; return;
+    }
+    if(rel.periodo_obrigatorio && perIni && perFim && perIni > perFim){
+      status.innerHTML = `<div class="proc-info-err">Período inválido: data de início é posterior à data fim.</div>`; return;
+    }
+
+    btn.disabled = true;
+    status.innerHTML = `<div class="proc-info-detail">Calculando checksum...</div>`;
+    try{
+      const hash = await _procHash(arquivoSelecionado);
+      status.innerHTML = `<div class="proc-info-detail">Enviando para Firebase Storage...</div>`;
+      const detected = layoutValidado && layoutValidado.parsed ? {n_linhas: layoutValidado.parsed.nRows, n_colunas: layoutValidado.parsed.nCols, sheet: layoutValidado.parsed.sheetName, layout_ok: layoutValidado.validacao.ok, chaves_achadas: layoutValidado.validacao.achadas.length, chaves_esperadas: layoutValidado.validacao.esperadas} : null;
+      const res = await _procGravarUpload(arquivoSelecionado, rel, base, filial, perIni, perFim, obs, hash, detected);
+      status.innerHTML = `<div class="proc-info-ok">Envio concluído. ID: <code>${esc(res.id)}</code></div>`;
+      limparInfo();
+      fileInput.value = '';
+      // Recarregar histórico do card
+      _procRenderHist(id, rel, base);
+    }catch(e){
+      console.error('[proc] erro no envio', e);
+      status.innerHTML = `<div class="proc-info-err">Falha no envio: ${esc(e.message||String(e))}</div>`;
+      btn.disabled = false;
+    }
+  });
+
+  // Ao mudar a base, recarregar o histórico
+  const baseSel = document.getElementById(id+'-base');
+  baseSel.addEventListener('change', ()=>_procRenderHist(id, rel, baseSel.value));
+
+  // Carregar histórico inicial
+  _procRenderHist(id, rel, baseSel.value);
+}
+
+async function _procRenderHist(id, rel, base){
+  const histDiv = document.getElementById(id+'-hist');
+  if(!histDiv) return;
+  histDiv.innerHTML = '<div class="proc-hist-empty">Carregando...</div>';
+  const list = await _procListarUltimos(rel.rotina, base, 5);
+  if(!list || list.length===0){
+    histDiv.innerHTML = '<div class="proc-hist-empty">Nenhum envio registrado ainda para essa base.</div>';
+    return;
+  }
+  histDiv.innerHTML = list.map(u=>{
+    const dt = u.uploaded_at && u.uploaded_at.toDate ? u.uploaded_at.toDate() : null;
+    const dtTxt = dt ? dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const per = (u.periodo_ini && u.periodo_fim) ? (u.periodo_ini.split('-').reverse().join('/')+' a '+u.periodo_fim.split('-').reverse().join('/')) : '';
+    const tamanho = u.arquivo_tamanho ? (u.arquivo_tamanho/1024/1024).toFixed(2)+' MB' : '';
+    const quem = u.uploaded_by_email || '';
+    const detParts = [];
+    if(per) detParts.push(per);
+    if(tamanho) detParts.push(tamanho);
+    if(u.filial) detParts.push('Filial: '+u.filial);
+    return `<div class="proc-hist-item">
+      <div class="proc-hist-l"><strong>${esc(dtTxt)}</strong>${quem?' · '+esc(quem):''}</div>
+      <div class="proc-hist-r">${esc(detParts.join(' · '))}</div>
+    </div>`;
+  }).join('');
+}
+
+
 function renderPage(pg){
   if(pg==='executivo')renderExecutivo();
   else if(pg==='cv')renderCV();
@@ -4807,6 +5333,7 @@ function renderPage(pg){
   else if(pg==='excesso')renderExcesso();
   else if(pg==='vencidos')renderVencidos();
   else if(pg==='admin')renderAdmin();
+  else if(pg==='proc')renderProc();
   else if(pg==='abc')renderABC();
   else if(pg==='historico')renderHistorico();
   else if(pg==='ajuda')renderAjuda();

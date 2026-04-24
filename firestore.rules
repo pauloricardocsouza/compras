@@ -1,6 +1,7 @@
 // ============================================================
 // REGRAS DE SEGURANÇA — Cloud Firestore
 // GPC Sistema Analítico · R2 Soluções
+// Versão 2.0 (inclui coleção uploads para a página de Processamento)
 // ============================================================
 // Copie e cole em: Firebase Console → Firestore Database → Regras
 //
@@ -88,6 +89,20 @@ service cloud.firestore {
     match /configuracoes/{base} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // uploads/{id}   (NOVO na v2.0 — página Processamento)
+    // ------------------------------------------------------------
+    // Metadados dos arquivos XLSX enviados da página de Processamento
+    // Leitura: admin (histórico completo)
+    // Criação: admin (apenas admins podem enviar relatórios)
+    // Atualização e exclusão bloqueadas (imutabilidade dos envios)
+    match /uploads/{uploadId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() &&
+                       request.resource.data.uploaded_by == request.auth.uid;
+      allow update, delete: if false;
     }
 
     // ------------------------------------------------------------
