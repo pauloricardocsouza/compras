@@ -1708,7 +1708,7 @@ const AUTH_MODE = 'firebase'; // 'mock' | 'firebase'
 // Convenção:
 //   X.x → alteração grande (quebra de compatibilidade, nova feature grande)
 //   x.X → alteração suave (fix, ajuste visual, pequeno refinamento)
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.2';
 
 // ================================================================
 // HELPERS DE CHART.JS — compatíveis com Safari/iOS (sem spread ops)
@@ -7323,11 +7323,12 @@ function computeVencidos(){
 // ================================================================
 const EXC_DIAS_PERIODO = 110; // Jan(31)+Fev(28)+Mar(31)+Abr parcial(~20)
 
-function computeExcesso(deptFiltro){
+function computeExcesso(deptFiltro, secFiltro){
   const DIAS_IDEAL = getEstoqueIdeal();
   const items=[];
   D.produtos.forEach(function(p){
     if(deptFiltro && p.dp!==deptFiltro) return;
+    if(secFiltro && p.sc!==secFiltro) return;
     const eq=p.eq||0, tq=p.tq||0, ev=p.ev||0;
     if(eq<=0) return;
     let diasCob, excessoQt, excessoValor, diasExcesso, vendaDiaria, tier;
@@ -7359,6 +7360,7 @@ function computeExcesso(deptFiltro){
 }
 
 let excDeptFiltro = null;
+let excSecaoFiltro = null;
 
 function renderExcesso(){
   if(isConsolidado()){ renderAvisoConsolidado("page-excesso", "A análise de excesso de estoque trabalha SKU por SKU. Selecione uma filial para ver os produtos com mais dias de cobertura."); return; }
@@ -7371,6 +7373,8 @@ function renderExcesso(){
       <div class="pfb-inner">
         <span class="pfl">DEPARTAMENTO</span>
         <select id="exc-dp" class="psel">${deptos.map(d=>`<option value="${d==='Todos'?'':d}">${d}</option>`).join('')}</select>
+        <span class="pfl" style="margin-left:10px;">SE\xc7\xc3O</span>
+        <select id="exc-sc" class="psel"><option value="">Todas</option></select>
         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-left:auto;">
           Ideal: ${getEstoqueIdeal()} dias \xb7 Per\xedodo: ${EXC_DIAS_PERIODO} dias (Jan-Abr/26)
         </span>
@@ -7403,9 +7407,19 @@ function renderExcesso(){
           <div class="ds-ico" style="background:var(--danger-bg);color:var(--danger-text);">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </div>
-          <div>
+          <div style="flex:1;">
             <div class="ds-title">SKUs com maior excesso</div>
-            <div class="ds-sub" id="exc-top-sub">Top 50 por valor \xb7 clique no c\xf3digo para abrir o Raio-X</div>
+            <div class="ds-sub" id="exc-top-sub">Top 100 por valor \xb7 clique no c\xf3digo para abrir o Raio-X</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-left:auto;">
+            <button id="exc-btn-xlsx" class="btn-ac" style="padding:7px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Exportar XLSX
+            </button>
+            <button id="exc-btn-pdf" class="btn-ac" style="padding:7px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Exportar PDF
+            </button>
           </div>
         </div>
         <div class="ds-body np">
@@ -7413,7 +7427,7 @@ function renderExcesso(){
             <table class="t" id="tbl-exc-sku">
               <thead><tr>
                 <th class="L">C\xf3digo</th><th class="L">Produto</th>
-                <th class="L">Depto</th><th class="L">Fornecedor</th>
+                <th class="L">Depto</th><th class="L">Se\xe7\xe3o</th><th class="L">Fornecedor</th>
                 <th>Estoque (qt)</th><th>Venda/dia</th>
                 <th>Dias cob.</th><th>Dias excesso</th>
                 <th>Valor excesso</th><th class="L">Classifica\xe7\xe3o</th>
@@ -7452,19 +7466,52 @@ function renderExcesso(){
   `;
   document.getElementById('page-excesso').innerHTML=html;
 
-  // Filtro dept
-  document.getElementById('exc-dp').value = excDeptFiltro || '';
-  document.getElementById('exc-dp').addEventListener('change', function(){
+  // Filtro dept + seção (cascata)
+  const dpSel = document.getElementById('exc-dp');
+  const scSel = document.getElementById('exc-sc');
+
+  function refreshSecoes(){
+    const deptoAtual = dpSel.value;
+    const secoes = deptoAtual
+      ? [...new Set(D.produtos.filter(p => p.dp===deptoAtual).map(p=>p.sc).filter(Boolean))].sort()
+      : [];
+    scSel.innerHTML = '<option value="">Todas</option>' + secoes.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    scSel.disabled = !deptoAtual;
+    scSel.style.opacity = deptoAtual ? '1' : '.5';
+    // Restaurar seleção se ainda for válida
+    if(excSecaoFiltro && secoes.indexOf(excSecaoFiltro)>=0){
+      scSel.value = excSecaoFiltro;
+    } else {
+      excSecaoFiltro = null;
+    }
+  }
+
+  dpSel.value = excDeptFiltro || '';
+  refreshSecoes();
+
+  dpSel.addEventListener('change', function(){
     excDeptFiltro = this.value || null;
+    excSecaoFiltro = null;
+    refreshSecoes();
     renderExcessoBody();
   });
+  scSel.addEventListener('change', function(){
+    excSecaoFiltro = this.value || null;
+    renderExcessoBody();
+  });
+
+  // Botões de export
+  document.getElementById('exc-btn-xlsx').addEventListener('click', _excExportarXLSX);
+  document.getElementById('exc-btn-pdf').addEventListener('click', _excExportarPDF);
+
   renderExcessoBody();
 }
 
 function renderExcessoBody(){
-  const items = computeExcesso(excDeptFiltro);
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
   const totalEstoque = D.produtos.reduce((s,p)=>{
     if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
+    if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
     return s + (p.ev||0);
   }, 0);
 
@@ -7486,7 +7533,7 @@ function renderExcessoBody(){
   // KPIs
   document.getElementById('exc-kpis').innerHTML = kgHtml([
     {l:'Valor em excesso', v:fB(totalExcesso,0), s:fP(pctExc)+' do estoque total', cls:pctExc>30?'dn':pctExc>15?'hl':''},
-    {l:'SKUs em excesso',  v:fI(items.length), s:'de '+fI(D.produtos.filter(p=>(!excDeptFiltro||p.dp===excDeptFiltro)&&(p.eq||0)>0).length)+' com estoque'},
+    {l:'SKUs em excesso',  v:fI(items.length), s:'de '+fI(D.produtos.filter(p=>(!excDeptFiltro||p.dp===excDeptFiltro)&&(!excSecaoFiltro||p.sc===excSecaoFiltro)&&(p.eq||0)>0).length)+' com estoque'},
     {l:'Dias m\xe9dios acima', v:Math.round(diasMedios)+' d', s:'al\xe9m dos '+getEstoqueIdeal()+' d ideais'},
     {l:'Pior depto', v:piorDp[0], s:fB(piorDp[1],0)+' em excesso', cls:'hl'},
   ]);
@@ -7538,13 +7585,14 @@ function renderExcessoBody(){
     critico: '<span style="background:var(--danger);color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">CR\xcdTICO</span>',
     'sem-venda': '<span style="background:#2a1a1a;color:#ff6b6b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">SEM VENDA</span>',
   };
-  const top50 = items.slice(0,50);
-  document.getElementById('exc-top-sub').textContent = `Top 50 de ${items.length} SKUs em excesso \xb7 clique no c\xf3digo para abrir o Raio-X`;
-  document.getElementById('tb-exc-sku').innerHTML = top50.map(i=>`
+  const top100 = items.slice(0,100);
+  document.getElementById('exc-top-sub').textContent = `Top 100 de ${items.length} SKUs em excesso \xb7 clique no c\xf3digo para abrir o Raio-X \xb7 use os bot\xf5es ao lado para exportar todos`;
+  document.getElementById('tb-exc-sku').innerHTML = top100.map(i=>`
     <tr>
       <td class="L"><a onclick="openProd(${i.c});return false;" style="cursor:pointer;font-family:'JetBrains Mono',monospace;color:var(--accent);font-weight:700;">${i.c}</a></td>
       <td class="L" style="max-width:300px;white-space:normal;">${esc(i.d||"")}</td>
       <td class="L val-dim">${esc(i.dp||"")}</td>
+      <td class="L val-dim">${esc(i.sc||"")}</td>
       <td class="L val-dim" style="max-width:180px;white-space:normal;">${esc(i.f||"")}</td>
       <td>${fI(i.eq)}</td>
       <td class="val-dim">${i.vendaDiaria>0?i.vendaDiaria.toFixed(1):'—'}</td>
@@ -7582,6 +7630,150 @@ function renderExcessoBody(){
     </tr>`;
   }).join('');
   makeSortable('tbl-exc-fn');
+}
+
+
+// ================================================================
+// EXPORT — Excesso de estoque (XLSX e PDF)
+// Usa os filtros atuais (depto + seção) e exporta TODOS os itens
+// com excesso, não apenas os 100 que aparecem na tela.
+// ================================================================
+function _excExportarXLSX(){
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
+  if(!items.length){ alert('Sem itens com excesso para exportar.'); return; }
+  const tierLbl = {leve:'LEVE',medio:'MEDIO',alto:'ALTO',critico:'CRITICO','sem-venda':'SEM VENDA'};
+  const totalExcesso = items.reduce((s,i)=>s+i.excessoValor,0);
+  const totalEstoque = D.produtos.reduce((s,p)=>{
+    if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
+    if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
+    return s + (p.ev||0);
+  }, 0);
+  const dtFmt = (D.meta && D.meta.data_estoque) ? D.meta.data_estoque : new Date().toISOString().slice(0,10);
+  const filialTxt = (D.meta && D.meta.filial_nome) || (D.meta && D.meta.filial) || 'ATP';
+  const resumo = [
+    ['Excesso de estoque - GPC'],
+    [],
+    ['Filial', filialTxt],
+    ['Data do estoque', dtFmt],
+    ['Ideal de cobertura (dias)', getEstoqueIdeal()],
+    ['Departamento', excDeptFiltro || 'Todos'],
+    ['Se\u00e7\u00e3o', excSecaoFiltro || 'Todas'],
+    [],
+    ['Total de itens em excesso', items.length],
+    ['Valor em excesso (R$)', totalExcesso],
+    ['Total do estoque no escopo (R$)', totalEstoque],
+    ['% do estoque em excesso', totalEstoque>0 ? (totalExcesso/totalEstoque*100) : 0]
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+
+  const header = ['C\u00f3digo','Produto','Departamento','Se\u00e7\u00e3o','Fornecedor',
+                  'Estoque (qt)','Venda/dia (qt)','Dias cobertura','Dias excesso',
+                  'Qt excesso','Valor estoque (R$)','Valor excesso (R$)',
+                  'Pre\u00e7o venda unit.','Classifica\u00e7\u00e3o'];
+  const rows = items.map(i => [
+    i.c, i.d, i.dp, i.sc, i.f,
+    i.eq, i.vendaDiaria, i.diasCob>=999?'sem venda':Number(i.diasCob.toFixed(1)),
+    i.diasExcesso>=999?'sem venda':Number(i.diasExcesso.toFixed(1)),
+    Number(i.excessoQt.toFixed(3)), Number(i.ev.toFixed(2)),
+    Number(i.excessoValor.toFixed(2)), i.pmv, tierLbl[i.tier]||i.tier
+  ]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), 'Itens em excesso');
+
+  const arq = 'GPC_Excesso_' + (excDeptFiltro? (excDeptFiltro+'_').replace(/\s+/g,'_') : '')
+            + (excSecaoFiltro? (excSecaoFiltro+'_').replace(/\s+/g,'_') : '')
+            + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, arq);
+  _auditLog('export_xlsx', {arquivo: arq, pagina: 'excesso', n_itens: items.length, depto: excDeptFiltro, secao: excSecaoFiltro});
+}
+
+function _excExportarPDF(){
+  const items = computeExcesso(excDeptFiltro, excSecaoFiltro);
+  if(!items.length){ alert('Sem itens com excesso para exportar.'); return; }
+  const totalExcesso = items.reduce((s,i)=>s+i.excessoValor,0);
+  const totalEstoque = D.produtos.reduce((s,p)=>{
+    if(excDeptFiltro && p.dp!==excDeptFiltro) return s;
+    if(excSecaoFiltro && p.sc!==excSecaoFiltro) return s;
+    return s + (p.ev||0);
+  }, 0);
+  const pctExc = totalEstoque>0 ? totalExcesso/totalEstoque*100 : 0;
+  const filialTxt = (D.meta && D.meta.filial_nome) || (D.meta && D.meta.filial) || 'ATP';
+  const dtFmt = (D.meta && D.meta.data_estoque) ? D.meta.data_estoque : new Date().toISOString().slice(0,10);
+  const tierLbl = {leve:'LEVE',medio:'MEDIO',alto:'ALTO',critico:'CRITICO','sem-venda':'SEM VENDA'};
+
+  const fmtBr = (n,d) => (typeof fB==='function') ? fB(n, d==null?0:d) : ('R$ '+Number(n||0).toFixed(d||0));
+  const fmtInt = (n) => (typeof fI==='function') ? fI(n) : String(Math.round(n||0));
+  const fmtPct = (n) => (typeof fP==='function') ? fP(n,1) : (Number(n||0).toFixed(1)+'%');
+
+  const rowsHtml = items.map(i => `
+    <tr>
+      <td class="c">${i.c}</td>
+      <td>${esc(i.d||'')}</td>
+      <td class="dim">${esc(i.dp||'')}</td>
+      <td class="dim">${esc(i.sc||'')}</td>
+      <td class="dim">${esc(i.f||'')}</td>
+      <td class="r">${fmtInt(i.eq)}</td>
+      <td class="r dim">${i.vendaDiaria>0?i.vendaDiaria.toFixed(1):'-'}</td>
+      <td class="r">${i.diasCob>=999?'\u221e':Math.round(i.diasCob)+' d'}</td>
+      <td class="r neg">${i.diasExcesso>=999?'\u221e':Math.round(i.diasExcesso)+' d'}</td>
+      <td class="r b">${fmtBr(i.excessoValor,0)}</td>
+      <td class="t">${tierLbl[i.tier]||''}</td>
+    </tr>`).join('');
+
+  const hoje = new Date().toLocaleString('pt-BR');
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Excesso de estoque - GPC</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; margin: 0; font-size: 10px; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #2E476F; }
+  .sub { font-size: 11px; color: #555; margin-bottom: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .kpi { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; }
+  .kpi .l { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .v { font-size: 15px; font-weight: 800; color: #111; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  thead th { background: #2E476F; color: #fff; padding: 5px 6px; text-align: left; font-weight: 600; }
+  tbody td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  td.r, th.r { text-align: right; }
+  td.c { font-family: ui-monospace, Menlo, Consolas, monospace; color: #2E476F; font-weight: 700; }
+  td.dim { color: #555; }
+  td.neg { color: #b91c1c; font-weight: 600; }
+  td.b { font-weight: 700; }
+  td.t { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #555; }
+  .rodape { margin-top: 8px; font-size: 8px; color: #888; }
+  @media print { .noprint { display: none; } }
+  .noprint { text-align: right; margin-bottom: 10px; }
+  .noprint button { background: #2E476F; color: #fff; border: none; padding: 8px 14px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600; }
+</style>
+</head><body>
+  <div class="noprint"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>
+  <h1>Excesso de estoque - GPC</h1>
+  <div class="sub">Filial: <strong>${esc(filialTxt)}</strong> \xb7 Estoque em ${esc(dtFmt)} \xb7 Ideal: ${getEstoqueIdeal()} dias \xb7 Departamento: <strong>${esc(excDeptFiltro||'Todos')}</strong> \xb7 Se\xe7\xe3o: <strong>${esc(excSecaoFiltro||'Todas')}</strong> \xb7 Gerado em ${esc(hoje)}</div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Valor em excesso</div><div class="v">${fmtBr(totalExcesso,0)}</div></div>
+    <div class="kpi"><div class="l">% do estoque</div><div class="v">${fmtPct(pctExc)}</div></div>
+    <div class="kpi"><div class="l">SKUs em excesso</div><div class="v">${fmtInt(items.length)}</div></div>
+    <div class="kpi"><div class="l">Estoque total</div><div class="v">${fmtBr(totalEstoque,0)}</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>C\xf3digo</th><th>Produto</th><th>Depto</th><th>Se\xe7\xe3o</th><th>Fornecedor</th>
+      <th class="r">Estoque</th><th class="r">Venda/dia</th><th class="r">Dias cob.</th>
+      <th class="r">Dias excesso</th><th class="r">Valor excesso</th><th>Classif.</th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="rodape">GPC Sistema Anal\xedtico de Compras \xb7 R2 Solu\xe7\xf5es Empresariais \xb7 ${items.length} SKUs listados</div>
+</body></html>`;
+  const win = window.open('', '_blank');
+  if(!win){ alert('Bloqueador de pop-ups impediu a abertura do PDF. Permita pop-ups para este site e tente novamente.'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  _auditLog('export_pdf', {pagina:'excesso', n_itens: items.length, depto: excDeptFiltro, secao: excSecaoFiltro});
 }
 
 
